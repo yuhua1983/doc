@@ -143,3 +143,103 @@ tmpfs               931M     0  931M   0% /dev/shm
 
 ```
 
+## 常用文件及参数配置
+
+* /etc/exports  --> NFS服务的主要配置文件
+* /var/lib/nfs/etab --> 记录NFS分享出来的目录的完整权限设定值
+
+/etc/exports的具体配置可以参考man exports的example
+
+> ```shell
+>    /               master(rw) trusty(rw,no_root_squash)
+>    /projects       proj*.local.domain(rw)
+>    /usr            *.local.domain(ro) @trusted(rw)
+>    /home/joe       pc001(rw,all_squash,anonuid=150,anongid=100)
+>    /pub            *(ro,insecure,all_squash)
+>    /srv/www        -sync,rw server @trusted @external(ro)
+>    /foo            2001:db8:9:e54::/64(rw) 192.0.2.0/24(rw)
+>    /build          buildhost[0-9].local.domain(rw)
+> ```
+
+访问权限选项
+
+- 设置输出目录只读：ro
+- 设置输出目录读写：rw
+
+用户映射选项
+
+- all_squash：将远程访问的所有普通用户及所属组都映射为匿名用户或用户组（nfsnobody）；
+- no_all_squash：与all_squash取反（默认设置）；
+- root_squash：将root用户及所属组都映射为匿名用户或用户组（默认设置）；
+- no_root_squash：与rootsquash取反；
+- anonuid=xxx：将远程访问的所有用户都映射为匿名用户，并指定该用户为本地用户（UID=xxx）；
+- anongid=xxx：将远程访问的所有用户组都映射为匿名用户组账户，并指定该匿名用户组账户为本地用户组账户（GID=xxx）；
+
+注意用户权限分两类，nfs里的权限和共享目录的权限，尽量把共享目录改成nfsnobody属主和属组
+
+Client端没权限创建文件：
+
+```Shell
+[root@CentOS6 ~]# cd /mnt
+[root@CentOS6 mnt]# ll
+total 0
+[root@CentOS6 mnt]# touch a
+touch: cannot touch `a': Permission denied
+
+```
+
+Server端查看并修改权限
+
+```Shell
+[root@servera data]# ls -ld /data/
+drwxr-xr-x 2 root root 4096 Feb 26 19:08 /data/
+[root@servera data]# chown nfsnobody.nfsnobody /data
+[root@servera data]#
+
+```
+
+Client端重新创建文件：
+
+```Shell
+[root@CentOS6 mnt]# touch a
+[root@CentOS6 mnt]# ll
+total 0
+-rw-r--r-- 1 nfsnobody nfsnobody 0 Feb 26 19:52 a
+[root@CentOS6 mnt]#
+
+```
+
+客户端mount参数查看
+
+```Shell
+[root@CentOS6 ~]# grep mnt /proc/mounts
+172.25.84.45:/data/ /mnt nfs4 rw,relatime,vers=4,rsize=262144,wsize=262144,namlen=255,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,clientaddr=172.25.84.39,minorversion=0,local_lock=none,addr=172.25.84.45 0 0
+
+```
+
+服务端默认配置参数查看,默认有个no_all_squash参数，建议生产环境配置all_squash在/etc/exports里面，这样非root用户创建的文件也会被压缩成nfsnobody（默认系统有nfsnodoby并且GID,UID是65535，centos5可能需要自己设置）
+
+```Shell
+[root@servera data]# cat /var/lib/nfs/etab
+/data   172.25.84.39(rw,sync,wdelay,hide,nocrossmnt,secure,root_squash,no_all_squash,no_subtree_check,secure_locks,acl,anonuid=65534,anongid=65534,sec=sys,rw,root_squash,no_all_squash)
+
+```
+
+## 常用命令
+
+* exportfs  [-aruv]
+
+  * -a 全部挂载或卸载 /etc/exports中的内容 
+  * -r 重新读取/etc/exports 中的信息 ，并同步更新/etc/exports、/var/lib/nfs/xtab
+  * -u 卸载单一目录（和-a一起使用为卸载所有/etc/exports文件中的目录）
+  * -v 在export的时候，将详细的信息输出到屏幕上
+
+  ​
+
+* rpcinfo -p nfsserver_ip
+
+* showmount -e nfsserver_ip
+
+* mount -o 参数 ip:/sharefolder /mnt
+
+* umount -lf /mnt 强制卸载/mnt目录
