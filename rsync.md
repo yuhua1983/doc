@@ -103,5 +103,58 @@ total size is 0  speedup is 0.00
 
 ```
 
+## rsyncd.conf
+
+```shell
+[root@servera backup]# cat /etc/rsyncd.conf
+#blog:http://yangh.cc
+##global configuration##
+#启动rsync daemon进程需要一个用户，这边设置rsync用户,需要手动创建
+uid = rsync   
+gid = rsync
+use chroot = no 
+max connections = 20
+timeout = 300
+pid file = /var/run/rsyncd.pid
+lock file = /var/run/rsync.lock
+log file = /var/log/rsyncd.log
+ignore errors
+read only = false
+list = false
+hosts allow = 192.168.122.0/24
+hosts deny = 0.0.0.0/32
+auth users = rsync_user
+secrets file = /etc/rsync.password
+
+##module configuration##
+#一般在模块下定义备份路径，不同的模块下放不同的路径，客户端传输时命令直接server::模块名就行了
+[backup]
+path = /home/usera/backup
+
+
+```
+
+## 常用参数
+
+* -a 保留文件属性
+* -v 输出命令执行信息
+* -z 压缩  一般-avz连起来用
+* -P 查看传输进度
+* --delete 删除，慎用，一般用于服务器间数据同步，用前先测试
+* --exclude= 排除某个文件 
+* --exclude-from= 排除文件里列出来的文件
+* -e 指定通道，默认走ssh但是ssh如果改了默认端口需要用这个参数
+
+```shell
+[userb@serverb ~]$ rsync -avz -e "ssh -p 22333" a usera@servera:/home/usera/
+usera@servera's password:
+sending incremental file list
+a
+
+sent 77 bytes  received 31 bytes  24.00 bytes/sec
+total size is 0  speedup is 0.00
+
+```
+
 
 
